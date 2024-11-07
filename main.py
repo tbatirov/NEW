@@ -10,7 +10,7 @@ from database import (
     save_trial_balance, save_statements, get_historical_statements,
     get_statements_by_period
 )
-from datetime import datetime
+from datetime import datetime, date
 import plotly.graph_objects as go
 
 # Page configuration
@@ -105,10 +105,13 @@ def main():
         )
         
         # Period selection
-        period = st.text_input(
-            "Enter Period (e.g., '2024-01' for January 2024)",
-            help="Enter the period in YYYY-MM format"
+        period_date = st.date_input(
+            "Select Period",
+            value=date.today(),
+            help="Select the month and year for the financial statements"
         )
+        # Format the date as YYYY-MM
+        period = period_date.strftime('%Y-%m')
 
         if uploaded_file is not None and period:
             try:
@@ -235,20 +238,40 @@ def main():
     with tab3:
         st.header("Compare Periods")
         
+        # Get all periods from historical statements
+        all_periods = [stmt[5] for stmt in get_historical_statements()]
+
+        if not all_periods:
+            st.info("No historical data available for comparison. Please generate some statements first.")
+            return
+
         # Period selection for comparison
         col1, col2 = st.columns(2)
         with col1:
-            period1 = st.selectbox(
+            try:
+                default_date1 = datetime.strptime(all_periods[0], '%Y-%m')
+            except (IndexError, ValueError):
+                default_date1 = date.today()
+            
+            period1_date = st.date_input(
                 "Select First Period",
-                [stmt[5] for stmt in get_historical_statements()],
-                key="period1"
+                value=default_date1,
+                key="period1_date"
             )
+            period1 = period1_date.strftime('%Y-%m')
+            
         with col2:
-            period2 = st.selectbox(
+            try:
+                default_date2 = datetime.strptime(all_periods[-1], '%Y-%m')
+            except (IndexError, ValueError):
+                default_date2 = date.today()
+                
+            period2_date = st.date_input(
                 "Select Second Period",
-                [stmt[5] for stmt in get_historical_statements()],
-                key="period2"
+                value=default_date2,
+                key="period2_date"
             )
+            period2 = period2_date.strftime('%Y-%m')
         
         if period1 and period2:
             # Get statements for selected periods
