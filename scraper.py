@@ -7,7 +7,7 @@ import time
 def get_nsbu_links() -> List[str]:
     """Get all relevant links from nsbu.uz"""
     base_url = "https://www.nsbu.uz"
-    standards_page = "/en/standards/"  # Assuming English version
+    standards_page = "/standards/"  # Removed /en/ since English version isn't available
     
     try:
         response = requests.get(base_url + standards_page)
