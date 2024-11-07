@@ -12,6 +12,10 @@ from database import (
 )
 from datetime import datetime, date
 import plotly.graph_objects as go
+from openai import OpenAI
+
+# Initialize OpenAI client
+openai_client = OpenAI()
 
 # Page configuration
 st.set_page_config(
@@ -69,6 +73,28 @@ def plot_ratio_radar_chart(ratios: dict, category: str):
         return fig
     return None
 
+def generate_ratio_analysis(ratios: dict) -> str:
+    """Generate AI analysis of financial ratios"""
+    prompt = f'''
+    Analyze the following financial ratios and provide insights:
+    {json.dumps(ratios, indent=2)}
+    
+    Please provide:
+    1. Overall financial health assessment
+    2. Key strengths and concerns
+    3. Specific recommendations for improvement
+    4. Industry comparison insights where possible
+    
+    Format the analysis in clear sections with bullet points.
+    '''
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-4-1106-preview",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    
+    return response.choices[0].message.content
+
 # Initialize session state with error handling
 if 'knowledge_base' not in st.session_state:
     with st.spinner('Setting up knowledge base...'):
@@ -78,7 +104,6 @@ if 'knowledge_base' not in st.session_state:
         except Exception as e:
             st.error(f"Error initializing knowledge base: {str(e)}")
             st.info("Continuing with limited functionality...")
-            # Set a dummy knowledge base to allow the app to continue
             st.session_state.knowledge_base = None
 
 def display_historical_statement(statement_data):
@@ -253,8 +278,8 @@ def main():
     elif selected_page == "Financial Ratios":
         st.header("Financial Ratios Analysis")
         
-        # Visualization options moved under header
-        show_radar = st.checkbox("Show Radar Charts", value=True)
+        # Add tabs for different views
+        ratio_view, analysis_view = st.tabs(["Ratio Details", "AI Analysis"])
         
         if 'current_statements' in st.session_state:
             try:
@@ -265,43 +290,56 @@ def main():
                 ratios = ratios_data['ratios']
                 explanations = ratios_data['explanations']
                 
-                # Display ratios by category
-                for category, category_ratios in ratios.items():
-                    st.subheader(category.replace('_', ' ').title())
+                with ratio_view:
+                    # Visualization options
+                    show_radar = st.checkbox("Show Radar Charts", value=True)
                     
-                    # Create two columns for the layout
-                    if show_radar:
-                        col1, col2 = st.columns([2, 1])
-                        with col1:
+                    # Display ratios by category
+                    for category, category_ratios in ratios.items():
+                        st.subheader(category.replace('_', ' ').title())
+                        
+                        # Create two columns for the layout
+                        if show_radar:
+                            col1, col2 = st.columns([2, 1])
+                            with col1:
+                                for ratio_name, ratio_value in category_ratios.items():
+                                    if ratio_value is not None:
+                                        # Create columns for ratio name, value, and explanation
+                                        rcol1, rcol2 = st.columns([2, 1])
+                                        with rcol1:
+                                            st.write(ratio_name.replace('_', ' ').title())
+                                        with rcol2:
+                                            st.write(f"{ratio_value:.2f}")
+                                        # Add tooltip with explanation
+                                        if ratio_name in explanations:
+                                            st.info(explanations[ratio_name])
+                            
+                            # Show radar chart in the second column
+                            with col2:
+                                chart = plot_ratio_radar_chart(ratios, category)
+                                if chart:
+                                    st.plotly_chart(chart, use_container_width=True)
+                        else:
                             for ratio_name, ratio_value in category_ratios.items():
                                 if ratio_value is not None:
-                                    # Create columns for ratio name, value, and explanation
                                     rcol1, rcol2 = st.columns([2, 1])
                                     with rcol1:
                                         st.write(ratio_name.replace('_', ' ').title())
                                     with rcol2:
                                         st.write(f"{ratio_value:.2f}")
-                                    # Add tooltip with explanation
                                     if ratio_name in explanations:
                                         st.info(explanations[ratio_name])
                         
-                        # Show radar chart in the second column
-                        with col2:
-                            chart = plot_ratio_radar_chart(ratios, category)
-                            if chart:
-                                st.plotly_chart(chart, use_container_width=True)
-                    else:
-                        for ratio_name, ratio_value in category_ratios.items():
-                            if ratio_value is not None:
-                                rcol1, rcol2 = st.columns([2, 1])
-                                with rcol1:
-                                    st.write(ratio_name.replace('_', ' ').title())
-                                with rcol2:
-                                    st.write(f"{ratio_value:.2f}")
-                                if ratio_name in explanations:
-                                    st.info(explanations[ratio_name])
+                        st.markdown("---")
                 
-                    st.markdown("---")
+                with analysis_view:
+                    try:
+                        with st.spinner("Generating analysis..."):
+                            analysis = generate_ratio_analysis(ratios)
+                            st.markdown(analysis)
+                    except Exception as e:
+                        st.error(f"Error generating analysis: {str(e)}")
+                
             except Exception as e:
                 st.error(f"Error calculating ratios: {str(e)}")
         else:
