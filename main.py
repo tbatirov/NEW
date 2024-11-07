@@ -1,4 +1,4 @@
-"""Main Streamlit application file"""
+"""Main Streamlit application file with enhanced export functionality"""
 import streamlit as st
 import pandas as pd
 from indexer import setup_knowledge_base
@@ -17,6 +17,8 @@ from openai import OpenAI
 from scraper import schedule_updates
 from update_checker import check_update_status
 from file_handlers import read_financial_file  # new file handlers added
+from export_utils import create_financial_statement_pdf, create_excel_export
+import base64
 
 # Initialize OpenAI client
 openai_client = OpenAI()
@@ -247,13 +249,14 @@ def main():
                         if st.session_state.knowledge_base is None:
                             st.warning("Knowledge base not available. Statements will be generated with limited context.")
 
-                        statements = process_trial_balance(
+                        statements, citations = process_trial_balance(
                             df,
                             st.session_state.knowledge_base
                         )
                         
-                        # Store statements in session state
+                        # Store statements and citations in session state
                         st.session_state.current_statements = statements
+                        st.session_state.current_citations = citations
                         
                         # Save statements to database
                         save_statements(trial_balance_id, statements)
@@ -277,15 +280,36 @@ def main():
                         st.markdown("## Cash Flow Statement")
                         display_financial_section(statements['cash_flow'])
 
-                        # Download button
-                        output = io.StringIO()
-                        json.dump(statements, output)
-                        st.download_button(
-                            label="Download Statements",
-                            data=output.getvalue(),
-                            file_name=f"financial_statements_{period}.json",
-                            mime="application/json"
-                        )
+                        # Citations section
+                        if citations:
+                            st.markdown("## Citations")
+                            for idx, citation in enumerate(citations, 1):
+                                st.markdown(f"**[{idx}]** {citation['text']}")
+                                st.markdown(f"*Source: {citation['source']}*")
+                        
+                        # Export options
+                        st.markdown("## Export Options")
+                        export_col1, export_col2 = st.columns(2)
+                        
+                        with export_col1:
+                            # PDF Export
+                            pdf_bytes = create_financial_statement_pdf(statements, citations, display_date)
+                            st.download_button(
+                                label="Download PDF",
+                                data=pdf_bytes,
+                                file_name=f"financial_statements_{period}.pdf",
+                                mime="application/pdf"
+                            )
+                        
+                        with export_col2:
+                            # Excel Export
+                            excel_bytes = create_excel_export(statements, citations, display_date)
+                            st.download_button(
+                                label="Download Excel",
+                                data=excel_bytes,
+                                file_name=f"financial_statements_{period}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
 
             except Exception as e:
                 st.error(f"Error processing file: {str(e)}")
