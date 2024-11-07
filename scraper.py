@@ -7,7 +7,7 @@ import time
 def get_nsbu_links() -> List[str]:
     """Get all relevant links from nsbu.uz"""
     base_url = "https://nsbu.uz"  # Updated URL without www
-    standards_page = "/page/buxgalteriya-hisobi-milliy-standartlari"  # Updated to actual standards page
+    standards_page = "/standards/accounting"  # Updated to actual standards page
     
     try:
         response = requests.get(base_url + standards_page)
