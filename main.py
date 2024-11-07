@@ -69,10 +69,17 @@ def plot_ratio_radar_chart(ratios: dict, category: str):
         return fig
     return None
 
-# Initialize session state
+# Initialize session state with error handling
 if 'knowledge_base' not in st.session_state:
     with st.spinner('Setting up knowledge base...'):
-        st.session_state.knowledge_base = setup_knowledge_base()
+        try:
+            st.session_state.knowledge_base = setup_knowledge_base()
+            st.success("Knowledge base initialized successfully!")
+        except Exception as e:
+            st.error(f"Error initializing knowledge base: {str(e)}")
+            st.info("Continuing with limited functionality...")
+            # Set a dummy knowledge base to allow the app to continue
+            st.session_state.knowledge_base = None
 
 def display_historical_statement(statement_data):
     file_name, balance_sheet, income_statement, cash_flow, generation_date, period = statement_data
@@ -110,19 +117,16 @@ def main():
         with col1:
             try:
                 period_date = st.date_input(
-                    "Select Statement Period",  # Add proper label
+                    "Select Statement Period",
                     value=date.today(),
                     min_value=date(2020, 1, 1),
                     max_value=date.today(),
                     help="Select the month and year for the financial statements",
-                    label_visibility="collapsed"  # Hide label but keep it for accessibility
+                    label_visibility="collapsed"
                 )
-                # Only show formatted date if period_date is not None
                 if period_date:
                     with col2:
                         st.markdown(f"**Selected Period:** {period_date.strftime('%B %Y')}")
-                    
-                    # Format the date as YYYY-MM for database
                     period = period_date.strftime('%Y-%m')
                 else:
                     st.error("Please select a valid date")
@@ -153,6 +157,10 @@ def main():
                 # Process button
                 if st.button("Generate Financial Statements"):
                     with st.spinner('Processing...'):
+                        # Warning if knowledge base is not available
+                        if st.session_state.knowledge_base is None:
+                            st.warning("Knowledge base not available. Statements will be generated with limited context.")
+
                         statements = process_trial_balance(
                             df,
                             st.session_state.knowledge_base
