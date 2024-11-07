@@ -167,25 +167,44 @@ def main():
     with tab2:
         st.header("Financial Ratios Analysis")
         if 'current_statements' in st.session_state:
-            ratios_data = calculate_ratios(
-                st.session_state.current_statements['balance_sheet'],
-                st.session_state.current_statements['income_statement']
-            )
-            ratios = ratios_data['ratios']
-            explanations = ratios_data['explanations']
-            
-            # Add visualization options
-            st.sidebar.subheader("Visualization Options")
-            show_radar = st.sidebar.checkbox("Show Radar Charts", value=True)
-            
-            # Display ratios by category
-            for category, category_ratios in ratios.items():
-                st.subheader(category.replace('_', ' ').title())
+            try:
+                ratios_data = calculate_ratios(
+                    st.session_state.current_statements.get('balance_sheet', {}),
+                    st.session_state.current_statements.get('income_statement', {})
+                )
+                ratios = ratios_data['ratios']
+                explanations = ratios_data['explanations']
                 
-                # Create two columns for the layout
-                if show_radar:
-                    col1, col2 = st.columns([2, 1])
-                    with col1:
+                # Add visualization options
+                st.sidebar.subheader("Visualization Options")
+                show_radar = st.sidebar.checkbox("Show Radar Charts", value=True)
+                
+                # Display ratios by category
+                for category, category_ratios in ratios.items():
+                    st.subheader(category.replace('_', ' ').title())
+                    
+                    # Create two columns for the layout
+                    if show_radar:
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            for ratio_name, ratio_value in category_ratios.items():
+                                if ratio_value is not None:
+                                    # Create columns for ratio name, value, and explanation
+                                    rcol1, rcol2 = st.columns([2, 1])
+                                    with rcol1:
+                                        st.write(ratio_name.replace('_', ' ').title())
+                                    with rcol2:
+                                        st.write(f"{ratio_value:.2f}")
+                                    # Add tooltip with explanation
+                                    if ratio_name in explanations:
+                                        st.info(explanations[ratio_name])
+                        
+                        # Show radar chart in the second column
+                        with col2:
+                            chart = plot_ratio_radar_chart(ratios, category)
+                            if chart:
+                                st.plotly_chart(chart, use_container_width=True)
+                    else:
                         for ratio_name, ratio_value in category_ratios.items():
                             if ratio_value is not None:
                                 # Create columns for ratio name, value, and explanation
@@ -197,26 +216,10 @@ def main():
                                 # Add tooltip with explanation
                                 if ratio_name in explanations:
                                     st.info(explanations[ratio_name])
-                    
-                    # Show radar chart in the second column
-                    with col2:
-                        chart = plot_ratio_radar_chart(ratios, category)
-                        if chart:
-                            st.plotly_chart(chart, use_container_width=True)
-                else:
-                    for ratio_name, ratio_value in category_ratios.items():
-                        if ratio_value is not None:
-                            # Create columns for ratio name, value, and explanation
-                            rcol1, rcol2 = st.columns([2, 1])
-                            with rcol1:
-                                st.write(ratio_name.replace('_', ' ').title())
-                            with rcol2:
-                                st.write(f"{ratio_value:.2f}")
-                            # Add tooltip with explanation
-                            if ratio_name in explanations:
-                                st.info(explanations[ratio_name])
                 
-                st.markdown("---")
+                    st.markdown("---")
+            except Exception as e:
+                st.error(f"Error calculating ratios: {str(e)}")
         else:
             st.info("Generate financial statements first to view ratios")
 
