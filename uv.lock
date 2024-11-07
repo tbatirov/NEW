@@ -2361,6 +2361,8 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "chromadb" },
     { name = "llama-index" },
+    { name = "llama-index-core" },
+    { name = "llama-index-llms-openai" },
     { name = "openai" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -2372,6 +2374,7 @@ dependencies = [
     { name = "streamlit" },
     { name = "trafilatura" },
     { name = "xlrd" },
+    { name = "xlsxwriter" },
 ]
 
 [package.metadata]
@@ -2379,6 +2382,8 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.3" },
     { name = "chromadb", specifier = ">=0.5.18" },
     { name = "llama-index", specifier = ">=0.11.22" },
+    { name = "llama-index-core", specifier = ">=0.11.22" },
+    { name = "llama-index-llms-openai", specifier = ">=0.2.16" },
     { name = "openai", specifier = ">=1.54.3" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.2.3" },
@@ -2390,6 +2395,7 @@ requires-dist = [
     { name = "streamlit", specifier = ">=1.40.0" },
     { name = "trafilatura", specifier = ">=1.12.2" },
     { name = "xlrd" },
+    { name = "xlsxwriter" },
 ]
 
 [[package]]
@@ -3096,6 +3102,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a6/b3/19a2540d21dea5f908304375bd43f5ed7a4c28a370dc9122c565423e6b44/xlrd-2.0.1.tar.gz", hash = "sha256:f72f148f54442c6b056bf931dbc34f986fd0c3b0b6b5a58d013c9aef274d0c88", size = 100259 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a6/0c/c2a72d51fe56e08a08acc85d13013558a2d793028ae7385448a6ccdfae64/xlrd-2.0.1-py2.py3-none-any.whl", hash = "sha256:6a33ee89877bd9abc1158129f6e94be74e2679636b8a205b43b85206c3f0bbdd", size = 96531 },
+]
+
+[[package]]
+name = "xlsxwriter"
+version = "3.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/c3/b36fa44a0610a0f65d2e65ba6a262cbe2554b819f1449731971f7c16ea3c/XlsxWriter-3.2.0.tar.gz", hash = "sha256:9977d0c661a72866a61f9f7a809e25ebbb0fb7036baa3b9fe74afcfca6b3cb8c", size = 198732 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/ea/53d1fe468e63e092cf16e2c18d16f50c29851242f9dd12d6a66e0d7f0d02/XlsxWriter-3.2.0-py3-none-any.whl", hash = "sha256:ecfd5405b3e0e228219bcaf24c2ca0915e012ca9464a14048021d21a995d490e", size = 159925 },
 ]
 
 [[package]]
