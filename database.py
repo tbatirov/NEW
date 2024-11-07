@@ -29,6 +29,29 @@ def init_db():
         )
     ''')
     
+    # Add knowledge base tables
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS standards_content (
+            id INTEGER PRIMARY KEY,
+            url TEXT UNIQUE,
+            content TEXT,
+            source TEXT,
+            last_updated TIMESTAMP,
+            last_checked TIMESTAMP,
+            status TEXT
+        )
+    ''')
+    
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS scraping_log (
+            id INTEGER PRIMARY KEY,
+            timestamp TIMESTAMP,
+            source TEXT,
+            status TEXT,
+            message TEXT
+        )
+    ''')
+    
     # Add period column if it doesn't exist
     try:
         c.execute('ALTER TABLE trial_balances ADD COLUMN period TEXT')
@@ -65,6 +88,36 @@ def save_statements(trial_balance_id: int, statements: dict):
     )
     conn.commit()
 
+def save_standard_content(url: str, content: str, source: str, status: str = 'active'):
+    """Save or update standard content in the database"""
+    conn = init_db()
+    c = conn.cursor()
+    now = datetime.now()
+    
+    c.execute('''
+        INSERT INTO standards_content (url, content, source, last_updated, last_checked, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(url) DO UPDATE SET
+            content=excluded.content,
+            last_updated=excluded.last_updated,
+            last_checked=excluded.last_checked,
+            status=excluded.status
+    ''', (url, content, source, now, now, status))
+    
+    conn.commit()
+
+def log_scraping_activity(source: str, status: str, message: str):
+    """Log scraping activity for monitoring"""
+    conn = init_db()
+    c = conn.cursor()
+    
+    c.execute('''
+        INSERT INTO scraping_log (timestamp, source, status, message)
+        VALUES (?, ?, ?, ?)
+    ''', (datetime.now(), source, status, message))
+    
+    conn.commit()
+
 def get_historical_statements():
     conn = init_db()
     c = conn.cursor()
@@ -99,3 +152,23 @@ def get_statements_by_period(period: str):
         LIMIT 1
     ''', (period,))
     return c.fetchone()
+
+def get_all_standards():
+    """Retrieve all standards content from database"""
+    conn = init_db()
+    c = conn.cursor()
+    c.execute('''
+        SELECT url, content, source, last_updated
+        FROM standards_content
+        WHERE status = 'active'
+    ''')
+    return c.fetchall()
+
+def get_standards_last_update():
+    """Get the timestamp of the last standards update"""
+    conn = init_db()
+    c = conn.cursor()
+    c.execute('''
+        SELECT MAX(last_updated) FROM standards_content
+    ''')
+    return c.fetchone()[0]

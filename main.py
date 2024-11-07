@@ -8,11 +8,13 @@ import io
 import json
 from database import (
     save_trial_balance, save_statements, get_historical_statements,
-    get_statements_by_period
+    get_statements_by_period, init_db
 )
 from datetime import datetime, date
 import plotly.graph_objects as go
 from openai import OpenAI
+from scraper import schedule_updates
+from update_checker import check_update_status
 
 # Initialize OpenAI client
 openai_client = OpenAI()
@@ -22,6 +24,28 @@ st.set_page_config(
     page_title="Uzbekistan Financial Statement Generator",
     layout="wide"
 )
+
+# Initialize database and start the automatic updates scheduler
+init_db()
+schedule_updates()
+
+# Add status checker to sidebar
+with st.sidebar:
+    st.title("System Status")
+    if st.button("Check Updates Status"):
+        status = check_update_status()
+        if status:
+            st.write("Knowledge Base Status:")
+            st.write(f"Total Standards: {status['total_standards']}")
+            if status['latest_update']:
+                st.write(f"Last Update: {status['latest_update']}")
+            
+            st.write("Recent Activity:")
+            for log in status['latest_logs']:
+                timestamp, source, status_type, message = log
+                st.write(f"- {timestamp}: {source} ({status_type})")
+        else:
+            st.error("Could not fetch update status")
 
 # Helper functions for financial statement display
 def format_amount(amount):
@@ -162,17 +186,6 @@ def get_selected_date(label: str, key: str | None = None, help_text: str | None 
 def main():
     st.title("Uzbekistan Financial Statement Generator")
     st.write("Generate financial statements according to NAS Uzbekistan standards")
-
-    # Initialize session state for knowledge base if not present
-    if 'knowledge_base' not in st.session_state:
-        with st.spinner('Setting up knowledge base...'):
-            try:
-                st.session_state.knowledge_base = setup_knowledge_base()
-                st.success("Knowledge base initialized successfully!")
-            except Exception as e:
-                st.error(f"Error initializing knowledge base: {str(e)}")
-                st.info("Continuing with limited functionality...")
-                st.session_state.knowledge_base = None
 
     # Add sidebar navigation
     st.sidebar.title("Navigation")
