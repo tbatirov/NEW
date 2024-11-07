@@ -82,6 +82,9 @@ if 'knowledge_base' not in st.session_state:
             st.session_state.knowledge_base = None
 
 def display_historical_statement(statement_data):
+    if not statement_data or len(statement_data) < 6:
+        return
+        
     file_name, balance_sheet, income_statement, cash_flow, generation_date, period = statement_data
     with st.expander(f"Statement from {generation_date} - {file_name} ({period})"):
         st.markdown("#### Balance Sheet")
@@ -97,14 +100,66 @@ def display_historical_statement(statement_data):
         st.markdown("#### Cash Flow Statement")
         display_financial_section(json.loads(cash_flow))
 
+def format_date(d: date) -> str:
+    """Helper function to safely format dates"""
+    if isinstance(d, date):
+        return d.strftime('%B %Y')
+    return ""
+
+def format_period(d: date) -> str:
+    """Helper function to format period for database"""
+    if isinstance(d, date):
+        return d.strftime('%Y-%m')
+    return ""
+
+def get_selected_date(label: str, key: str | None = None, help_text: str | None = None) -> tuple[date | None, str | None, str | None]:
+    """Helper function to handle date selection"""
+    try:
+        selected_date = st.date_input(
+            label,
+            value=date.today(),
+            min_value=date(2020, 1, 1),
+            max_value=date.today(),
+            key=key,
+            help=help_text
+        )
+        
+        if isinstance(selected_date, date):
+            period = selected_date.strftime('%Y-%m')
+            display_date = selected_date.strftime('%B %Y')
+            return selected_date, period, display_date
+        
+    except Exception as e:
+        st.error(f"Error with date selection: {str(e)}")
+    
+    return None, None, None
+
 def main():
     st.title("Uzbekistan Financial Statement Generator")
     st.write("Generate financial statements according to NAS Uzbekistan standards")
 
-    # Create tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["Generate Statements", "Financial Ratios", "Compare Periods", "History"])
+    # Initialize session state for knowledge base if not present
+    if 'knowledge_base' not in st.session_state:
+        with st.spinner('Setting up knowledge base...'):
+            try:
+                st.session_state.knowledge_base = setup_knowledge_base()
+                st.success("Knowledge base initialized successfully!")
+            except Exception as e:
+                st.error(f"Error initializing knowledge base: {str(e)}")
+                st.info("Continuing with limited functionality...")
+                st.session_state.knowledge_base = None
 
-    with tab1:
+    # Add sidebar navigation
+    st.sidebar.title("Navigation")
+    selected_page = st.sidebar.radio(
+        "Go to",
+        ["Generate Statements", "Financial Ratios", "Compare Periods", "History"],
+        label_visibility="collapsed"
+    )
+
+    # Generate Statements Page
+    if selected_page == "Generate Statements":
+        st.header("Generate Statements")
         # File upload
         uploaded_file = st.file_uploader(
             "Upload Trial Balance (CSV or Excel)",
@@ -114,26 +169,16 @@ def main():
         # Period selection with calendar
         st.markdown("### Select Period")
         col1, col2 = st.columns([2, 1])
+        
         with col1:
-            try:
-                period_date = st.date_input(
-                    "Select Statement Period",
-                    value=date.today(),
-                    min_value=date(2020, 1, 1),
-                    max_value=date.today(),
-                    help="Select the month and year for the financial statements",
-                    label_visibility="collapsed"
-                )
-                if period_date:
-                    with col2:
-                        st.markdown(f"**Selected Period:** {period_date.strftime('%B %Y')}")
-                    period = period_date.strftime('%Y-%m')
-                else:
-                    st.error("Please select a valid date")
-                    period = None
-            except Exception as e:
-                st.error(f"Error with date selection: {str(e)}")
-                period = None
+            date_obj, period, display_date = get_selected_date(
+                "Select Statement Period",
+                help_text="Select the month and year for the financial statements"
+            )
+            
+            if date_obj and period:
+                with col2:
+                    st.markdown(f"**Selected Period:** {display_date}")
 
         if uploaded_file is not None and period:
             try:
@@ -193,19 +238,24 @@ def main():
 
                         # Download button
                         output = io.StringIO()
-                        pd.DataFrame(statements).to_csv(output, index=False)
+                        json.dump(statements, output)
                         st.download_button(
                             label="Download Statements",
                             data=output.getvalue(),
-                            file_name=f"financial_statements_{period}.csv",
-                            mime="text/csv"
+                            file_name=f"financial_statements_{period}.json",
+                            mime="application/json"
                         )
 
             except Exception as e:
                 st.error(f"Error processing file: {str(e)}")
 
-    with tab2:
+    # Financial Ratios Page
+    elif selected_page == "Financial Ratios":
         st.header("Financial Ratios Analysis")
+        
+        # Visualization options moved under header
+        show_radar = st.checkbox("Show Radar Charts", value=True)
+        
         if 'current_statements' in st.session_state:
             try:
                 ratios_data = calculate_ratios(
@@ -214,10 +264,6 @@ def main():
                 )
                 ratios = ratios_data['ratios']
                 explanations = ratios_data['explanations']
-                
-                # Add visualization options
-                st.sidebar.subheader("Visualization Options")
-                show_radar = st.sidebar.checkbox("Show Radar Charts", value=True)
                 
                 # Display ratios by category
                 for category, category_ratios in ratios.items():
@@ -261,7 +307,8 @@ def main():
         else:
             st.info("Generate financial statements first to view ratios")
 
-    with tab3:
+    # Compare Periods Page
+    elif selected_page == "Compare Periods":
         st.header("Compare Periods")
         
         # Get all periods from historical statements and filter out None values
@@ -277,46 +324,22 @@ def main():
             # First Period
             with col1:
                 st.markdown("**First Period**")
-                try:
-                    period1_date = st.date_input(
-                        "Select First Period",
-                        value=date.today(),
-                        min_value=date(2020, 1, 1),
-                        max_value=date.today(),
-                        key="period1_date",
-                        label_visibility="collapsed"
-                    )
-                    if period1_date:
-                        period1 = period1_date.strftime('%Y-%m')
-                        st.markdown(f"**Selected:** {period1_date.strftime('%B %Y')}")
-                    else:
-                        st.error("Please select a valid first period")
-                        period1 = None
-                except Exception as e:
-                    st.error(f"Error with first period selection: {str(e)}")
-                    period1 = None
+                date_obj1, period1, display_date1 = get_selected_date(
+                    "Select First Period",
+                    key="period1_date"
+                )
+                if date_obj1:
+                    st.markdown(f"**Selected:** {display_date1}")
             
             # Second Period
             with col2:
                 st.markdown("**Second Period**")
-                try:
-                    period2_date = st.date_input(
-                        "Select Second Period",
-                        value=date.today(),
-                        min_value=date(2020, 1, 1),
-                        max_value=date.today(),
-                        key="period2_date",
-                        label_visibility="collapsed"
-                    )
-                    if period2_date:
-                        period2 = period2_date.strftime('%Y-%m')
-                        st.markdown(f"**Selected:** {period2_date.strftime('%B %Y')}")
-                    else:
-                        st.error("Please select a valid second period")
-                        period2 = None
-                except Exception as e:
-                    st.error(f"Error with second period selection: {str(e)}")
-                    period2 = None
+                date_obj2, period2, display_date2 = get_selected_date(
+                    "Select Second Period",
+                    key="period2_date"
+                )
+                if date_obj2:
+                    st.markdown(f"**Selected:** {display_date2}")
             
             if period1 and period2:
                 # Get statements for selected periods
@@ -369,22 +392,15 @@ def main():
                     with col3:
                         st.markdown("#### Variances")
                         display_financial_section(variances['income_statement'])
-                    
-                    # Generate and display trend charts
-                    st.subheader("Trend Analysis")
-                    comparison_data = generate_comparison_charts([
-                        {'period': period1, 'statements': statements1},
-                        {'period': period2, 'statements': statements2}
-                    ])
-                    st.plotly_chart(comparison_data['trend_chart'])
                 else:
                     st.warning("Could not find statements for one or both selected periods")
 
-    with tab4:
+    # History Page
+    else:  # History
         st.header("Historical Statements")
-        historical_statements = get_historical_statements()
-        if historical_statements:
-            for statement in historical_statements:
+        statements = get_historical_statements()
+        if statements:
+            for statement in statements:
                 display_historical_statement(statement)
         else:
             st.info("No historical statements found. Generate some statements to see them here!")
