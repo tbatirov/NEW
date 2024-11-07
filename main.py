@@ -2,10 +2,12 @@ import streamlit as st
 import pandas as pd
 from indexer import setup_knowledge_base
 from processor import process_trial_balance
+from ratios import calculate_ratios
 import io
 import json
 from database import save_trial_balance, save_statements, get_historical_statements
 from datetime import datetime
+import plotly.graph_objects as go
 
 # Page configuration
 st.set_page_config(
@@ -33,6 +35,36 @@ def display_financial_section(data, indent_level=0):
             # Display leaf nodes with proper number formatting
             st.write(f"{'    ' * indent_level}{display_key}: {format_amount(value)}")
 
+def plot_ratio_radar_chart(ratios: dict, category: str):
+    """Create a radar chart for a specific ratio category"""
+    category_ratios = ratios[category]
+    values = []
+    labels = []
+    
+    for name, value in category_ratios.items():
+        if value is not None:
+            labels.append(name.replace('_', ' ').title())
+            values.append(value)
+    
+    if values:  # Only create chart if there are valid values
+        fig = go.Figure(data=go.Scatterpolar(
+            r=values,
+            theta=labels,
+            fill='toself'
+        ))
+        
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, max(values) * 1.2]
+                )),
+            showlegend=False,
+            title=category.replace('_', ' ').title()
+        )
+        return fig
+    return None
+
 # Initialize session state
 if 'knowledge_base' not in st.session_state:
     with st.spinner('Setting up knowledge base...'):
@@ -58,8 +90,8 @@ def main():
     st.title("Uzbekistan Financial Statement Generator")
     st.write("Generate financial statements according to NAS Uzbekistan standards")
 
-    # Create tabs for Generate and History
-    tab1, tab2 = st.tabs(["Generate Statements", "History"])
+    # Create tabs
+    tab1, tab2, tab3 = st.tabs(["Generate Statements", "Financial Ratios", "History"])
 
     with tab1:
         # File upload
@@ -93,6 +125,9 @@ def main():
                             df,
                             st.session_state.knowledge_base
                         )
+                        
+                        # Store statements in session state
+                        st.session_state.current_statements = statements
                         
                         # Save statements to database
                         save_statements(trial_balance_id, statements)
@@ -130,6 +165,62 @@ def main():
                 st.error(f"Error processing file: {str(e)}")
 
     with tab2:
+        st.header("Financial Ratios Analysis")
+        if 'current_statements' in st.session_state:
+            ratios_data = calculate_ratios(
+                st.session_state.current_statements['balance_sheet'],
+                st.session_state.current_statements['income_statement']
+            )
+            ratios = ratios_data['ratios']
+            explanations = ratios_data['explanations']
+            
+            # Add visualization options
+            st.sidebar.subheader("Visualization Options")
+            show_radar = st.sidebar.checkbox("Show Radar Charts", value=True)
+            
+            # Display ratios by category
+            for category, category_ratios in ratios.items():
+                st.subheader(category.replace('_', ' ').title())
+                
+                # Create two columns for the layout
+                if show_radar:
+                    col1, col2 = st.columns([2, 1])
+                    with col1:
+                        for ratio_name, ratio_value in category_ratios.items():
+                            if ratio_value is not None:
+                                # Create columns for ratio name, value, and explanation
+                                rcol1, rcol2 = st.columns([2, 1])
+                                with rcol1:
+                                    st.write(ratio_name.replace('_', ' ').title())
+                                with rcol2:
+                                    st.write(f"{ratio_value:.2f}")
+                                # Add tooltip with explanation
+                                if ratio_name in explanations:
+                                    st.info(explanations[ratio_name])
+                    
+                    # Show radar chart in the second column
+                    with col2:
+                        chart = plot_ratio_radar_chart(ratios, category)
+                        if chart:
+                            st.plotly_chart(chart, use_container_width=True)
+                else:
+                    for ratio_name, ratio_value in category_ratios.items():
+                        if ratio_value is not None:
+                            # Create columns for ratio name, value, and explanation
+                            rcol1, rcol2 = st.columns([2, 1])
+                            with rcol1:
+                                st.write(ratio_name.replace('_', ' ').title())
+                            with rcol2:
+                                st.write(f"{ratio_value:.2f}")
+                            # Add tooltip with explanation
+                            if ratio_name in explanations:
+                                st.info(explanations[ratio_name])
+                
+                st.markdown("---")
+        else:
+            st.info("Generate financial statements first to view ratios")
+
+    with tab3:
         st.header("Historical Statements")
         historical_statements = get_historical_statements()
         if historical_statements:
