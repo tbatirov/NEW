@@ -8,6 +8,7 @@ dependencies = [
     "chromadb>=0.5.18",
     "llama-index>=0.11.22",
     "openai>=1.54.3",
+    "openpyxl>=3.1.5",
     "pandas>=2.2.3",
     "streamlit>=1.40.0",
     "trafilatura>=1.12.2",
