@@ -1,7 +1,7 @@
 from llama_index.core import Settings, VectorStoreIndex
 from llama_index.core.schema import Document
 from llama_index.core.node_parser import SimpleNodeParser
-from openai import OpenAI
+from llama_index.llms.openai import OpenAI
 from scraper import scrape_standards
 from typing import List
 import os
@@ -10,8 +10,8 @@ def setup_knowledge_base() -> VectorStoreIndex:
     """Setup and return LlamaIndex knowledge base"""
     
     # Setup Settings
-    Settings.llm = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), model="gpt-4")
-    Settings.embed_model = "local"
+    Settings.llm = OpenAI()  # It will automatically use OPENAI_API_KEY from environment
+    Settings.embed_model = "default"  # This will use OpenAI's ada-002 model
     
     # Scrape standards
     standards = scrape_standards()
@@ -42,7 +42,8 @@ def query_knowledge_base(
     """Query the knowledge base and return relevant passages"""
     
     query_engine = index.as_query_engine(
-        similarity_top_k=num_results
+        similarity_top_k=num_results,
+        llm=OpenAI(model="gpt-4", api_key=os.environ.get("OPENAI_API_KEY"))  # Restored the model parameter
     )
     response = query_engine.query(query)
     
