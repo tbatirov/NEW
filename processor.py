@@ -33,10 +33,14 @@ def process_trial_balance(df: pd.DataFrame, knowledge_base: VectorStoreIndex = N
                 print(f"Error querying knowledge base: {e}")
                 # Continue with empty standards list
         
+        # Calculate net balances using end of period values
+        df['net_balance'] = df['end_of_period_debit'] - df['end_of_period_credit']
+        
         # Prepare context for OpenAI
         context = "\n".join([
             "Trial Balance Data:",
-            df.to_string(),
+            "Account Information:",
+            df[['Account_code', 'Account_name', 'net_balance']].to_string(),
             "\nRelevant Accounting Standards:",
             "\n".join(relevant_standards) if relevant_standards else "Using default accounting principles"
         ])
@@ -46,24 +50,26 @@ def process_trial_balance(df: pd.DataFrame, knowledge_base: VectorStoreIndex = N
         Based on the following trial balance and {'Uzbekistan accounting standards' if relevant_standards else 'general accounting principles'}:
         {context}
         
-        Generate a complete set of financial statements following the exact structure below:
-
+        Generate a complete set of financial statements following the exact structure below.
+        Use the net_balance values provided (positive for debit balances, negative for credit balances).
+        
         Balance Sheet Structure:
         {json.dumps(BALANCE_SHEET_TEMPLATE, indent=2)}
-
+        
         Income Statement Structure:
         {json.dumps(INCOME_STATEMENT_TEMPLATE, indent=2)}
-
+        
         Cash Flow Statement Structure:
         {json.dumps(CASH_FLOW_TEMPLATE, indent=2)}
-
+        
         Requirements:
         1. Follow {'Uzbekistan NAS standards' if relevant_standards else 'general accounting principles'} strictly
         2. Classify all accounts according to the provided templates
         3. Ensure all amounts are properly calculated and balanced
-        4. Use proper account names
+        4. Use proper account names from Account_name field
         5. Return a single JSON object with three main keys: 'balance_sheet', 'income_statement', and 'cash_flow'
         6. Each statement should follow the exact structure shown above
+        7. Use net_balance values for classification (positive values are debits, negative are credits)
         """
         
         response = openai_client.chat.completions.create(
