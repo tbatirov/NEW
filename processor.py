@@ -1,4 +1,5 @@
-from typing import Dict, Any
+"""Financial statement processor with citation tracking"""
+from typing import Dict, Any, List, Tuple
 import pandas as pd
 from llama_index.core import VectorStoreIndex
 from indexer import query_knowledge_base
@@ -10,17 +11,24 @@ from templates import BALANCE_SHEET_TEMPLATE, INCOME_STATEMENT_TEMPLATE, CASH_FL
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 openai_client = OpenAI()
 
-def process_trial_balance(df: pd.DataFrame, knowledge_base: VectorStoreIndex = None) -> Dict[str, Any]:
-    """Process trial balance and generate financial statements"""
+def process_trial_balance(df: pd.DataFrame, knowledge_base: VectorStoreIndex = None) -> Tuple[Dict[str, Any], List[Dict[str, str]]]:
+    """Process trial balance and generate financial statements with citations"""
     try:
         # Get relevant accounting standards if knowledge base is available
         relevant_standards = []
+        citations = []
         if knowledge_base is not None:
             try:
                 relevant_standards = query_knowledge_base(
                     knowledge_base,
                     "financial statement preparation requirements and classification rules"
                 )
+                # Track citations
+                for idx, standard in enumerate(relevant_standards):
+                    citations.append({
+                        'text': standard,
+                        'source': f"NAS Uzbekistan Standards"
+                    })
             except Exception as e:
                 print(f"Error querying knowledge base: {e}")
                 # Continue with empty standards list
@@ -72,7 +80,7 @@ def process_trial_balance(df: pd.DataFrame, knowledge_base: VectorStoreIndex = N
             if key not in statements:
                 statements[key] = {}  # Initialize empty if missing
         
-        return statements
+        return statements, citations
     except Exception as e:
         print(f"Error generating statements: {e}")
         # Return empty structure if error occurs
@@ -80,4 +88,4 @@ def process_trial_balance(df: pd.DataFrame, knowledge_base: VectorStoreIndex = N
             'balance_sheet': {},
             'income_statement': {},
             'cash_flow': {}
-        }
+        }, []
