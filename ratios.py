@@ -2,19 +2,30 @@
 from typing import Dict, Any
 
 
+def get_nested_value(data: dict, *keys, default=0) -> float:
+    current = data
+    for key in keys:
+        if isinstance(current, dict):
+            current = current.get(key, default)
+        else:
+            return default
+    # Handle case where the final value is a dictionary
+    if isinstance(current, dict):
+        # Sum all numeric values in the dictionary
+        total = 0
+        for value in current.values():
+            if isinstance(value, (int, float)):
+                total += value
+            elif isinstance(value, dict):
+                # Recursively sum nested dictionaries
+                total += sum(v for v in value.values() if isinstance(v, (int, float)))
+        return float(total)
+    return float(current) if current != default else default
+
+
 def calculate_ratios(balance_sheet: dict, income_statement: dict) -> dict:
     """Calculate financial ratios from balance sheet and income statement"""
     
-    def get_nested_value(data: dict, *keys, default=0) -> float:
-        """Helper function to safely get nested dictionary values"""
-        current = data
-        for key in keys:
-            if isinstance(current, dict):
-                current = current.get(key, {})
-            else:
-                return default
-        return float(current) if current != {} else default
-
     # Extract common values used in multiple ratios
     current_assets = get_nested_value(balance_sheet, 'assets', 'current_assets')
     current_liabilities = get_nested_value(balance_sheet, 'liabilities', 'current_liabilities')
