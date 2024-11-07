@@ -1,12 +1,17 @@
-from llama_index.core import VectorStoreIndex, ServiceContext
+from llama_index.core import Settings, VectorStoreIndex
 from llama_index.core.schema import Document
 from llama_index.core.node_parser import SimpleNodeParser
+from openai import OpenAI
 from scraper import scrape_standards
 from typing import List
 import os
 
 def setup_knowledge_base() -> VectorStoreIndex:
     """Setup and return LlamaIndex knowledge base"""
+    
+    # Setup Settings
+    Settings.llm = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), model="gpt-4")
+    Settings.embed_model = "local"
     
     # Scrape standards
     standards = scrape_standards()
@@ -25,8 +30,7 @@ def setup_knowledge_base() -> VectorStoreIndex:
     nodes = parser.get_nodes_from_documents(documents)
     
     # Create and return index
-    service_context = ServiceContext.from_defaults()
-    index = VectorStoreIndex(nodes, service_context=service_context)
+    index = VectorStoreIndex(nodes)
     
     return index
 
