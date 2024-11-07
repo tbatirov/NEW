@@ -238,102 +238,101 @@ def main():
     with tab3:
         st.header("Compare Periods")
         
-        # Get all periods from historical statements
-        all_periods = [stmt[5] for stmt in get_historical_statements()]
+        # Get all periods from historical statements and filter out None values
+        all_periods = [stmt[5] for stmt in get_historical_statements() if stmt[5] is not None]
 
         if not all_periods:
             st.info("No historical data available for comparison. Please generate some statements first.")
-            return
-
-        # Period selection for comparison
-        col1, col2 = st.columns(2)
-        with col1:
-            try:
-                default_date1 = datetime.strptime(all_periods[0], '%Y-%m')
-            except (IndexError, ValueError):
-                default_date1 = date.today()
+        else:
+            # Period selection for comparison
+            col1, col2 = st.columns(2)
+            with col1:
+                try:
+                    default_date1 = datetime.strptime(all_periods[0], '%Y-%m')
+                except (IndexError, ValueError):
+                    default_date1 = date.today()
+                
+                period1_date = st.date_input(
+                    "Select First Period",
+                    value=default_date1,
+                    key="period1_date"
+                )
+                period1 = period1_date.strftime('%Y-%m')
+                
+            with col2:
+                try:
+                    default_date2 = datetime.strptime(all_periods[-1], '%Y-%m')
+                except (IndexError, ValueError):
+                    default_date2 = date.today()
+                    
+                period2_date = st.date_input(
+                    "Select Second Period",
+                    value=default_date2,
+                    key="period2_date"
+                )
+                period2 = period2_date.strftime('%Y-%m')
             
-            period1_date = st.date_input(
-                "Select First Period",
-                value=default_date1,
-                key="period1_date"
-            )
-            period1 = period1_date.strftime('%Y-%m')
-            
-        with col2:
-            try:
-                default_date2 = datetime.strptime(all_periods[-1], '%Y-%m')
-            except (IndexError, ValueError):
-                default_date2 = date.today()
+            if period1 and period2:
+                # Get statements for selected periods
+                stmt1 = get_statements_by_period(period1)
+                stmt2 = get_statements_by_period(period2)
                 
-            period2_date = st.date_input(
-                "Select Second Period",
-                value=default_date2,
-                key="period2_date"
-            )
-            period2 = period2_date.strftime('%Y-%m')
-        
-        if period1 and period2:
-            # Get statements for selected periods
-            stmt1 = get_statements_by_period(period1)
-            stmt2 = get_statements_by_period(period2)
-            
-            if stmt1 and stmt2:
-                # Parse statements
-                statements1 = {
-                    'balance_sheet': json.loads(stmt1[1]),
-                    'income_statement': json.loads(stmt1[2]),
-                    'cash_flow': json.loads(stmt1[3])
-                }
-                statements2 = {
-                    'balance_sheet': json.loads(stmt2[1]),
-                    'income_statement': json.loads(stmt2[2]),
-                    'cash_flow': json.loads(stmt2[3])
-                }
-                
-                # Calculate variances
-                variances = calculate_variances(statements1, statements2)
-                
-                # Display side-by-side comparison
-                st.subheader("Statement Comparison")
-                
-                # Balance Sheet Comparison
-                st.markdown("### Balance Sheet")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.markdown(f"#### {period1}")
-                    display_financial_section(statements1['balance_sheet'])
-                with col2:
-                    st.markdown(f"#### {period2}")
-                    display_financial_section(statements2['balance_sheet'])
-                with col3:
-                    st.markdown("#### Variances")
-                    display_financial_section(variances['balance_sheet'])
-                
-                st.markdown("---")
-                
-                # Income Statement Comparison
-                st.markdown("### Income Statement")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.markdown(f"#### {period1}")
-                    display_financial_section(statements1['income_statement'])
-                with col2:
-                    st.markdown(f"#### {period2}")
-                    display_financial_section(statements2['income_statement'])
-                with col3:
-                    st.markdown("#### Variances")
-                    display_financial_section(variances['income_statement'])
-                
-                # Generate and display trend charts
-                st.subheader("Trend Analysis")
-                comparison_data = generate_comparison_charts([
-                    {'period': period1, 'statements': statements1},
-                    {'period': period2, 'statements': statements2}
-                ])
-                st.plotly_chart(comparison_data['trend_chart'])
-            else:
-                st.warning("Could not find statements for one or both selected periods")
+                if stmt1 and stmt2:
+                    # Parse statements
+                    statements1 = {
+                        'balance_sheet': json.loads(stmt1[1]),
+                        'income_statement': json.loads(stmt1[2]),
+                        'cash_flow': json.loads(stmt1[3])
+                    }
+                    statements2 = {
+                        'balance_sheet': json.loads(stmt2[1]),
+                        'income_statement': json.loads(stmt2[2]),
+                        'cash_flow': json.loads(stmt2[3])
+                    }
+                    
+                    # Calculate variances
+                    variances = calculate_variances(statements1, statements2)
+                    
+                    # Display side-by-side comparison
+                    st.subheader("Statement Comparison")
+                    
+                    # Balance Sheet Comparison
+                    st.markdown("### Balance Sheet")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.markdown(f"#### {period1}")
+                        display_financial_section(statements1['balance_sheet'])
+                    with col2:
+                        st.markdown(f"#### {period2}")
+                        display_financial_section(statements2['balance_sheet'])
+                    with col3:
+                        st.markdown("#### Variances")
+                        display_financial_section(variances['balance_sheet'])
+                    
+                    st.markdown("---")
+                    
+                    # Income Statement Comparison
+                    st.markdown("### Income Statement")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.markdown(f"#### {period1}")
+                        display_financial_section(statements1['income_statement'])
+                    with col2:
+                        st.markdown(f"#### {period2}")
+                        display_financial_section(statements2['income_statement'])
+                    with col3:
+                        st.markdown("#### Variances")
+                        display_financial_section(variances['income_statement'])
+                    
+                    # Generate and display trend charts
+                    st.subheader("Trend Analysis")
+                    comparison_data = generate_comparison_charts([
+                        {'period': period1, 'statements': statements1},
+                        {'period': period2, 'statements': statements2}
+                    ])
+                    st.plotly_chart(comparison_data['trend_chart'])
+                else:
+                    st.warning("Could not find statements for one or both selected periods")
 
     with tab4:
         st.header("Historical Statements")
