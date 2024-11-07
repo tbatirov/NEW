@@ -108,18 +108,28 @@ def main():
         st.markdown("### Select Period")
         col1, col2 = st.columns([2, 1])
         with col1:
-            period_date = st.date_input(
-                "",  # Remove label as we're using markdown above
-                value=date.today(),
-                min_value=date(2020, 1, 1),  # Set reasonable min date
-                max_value=date.today(),  # Can't select future dates
-                help="Select the month and year for the financial statements"
-            )
-        with col2:
-            st.markdown(f"**Selected Period:** {period_date.strftime('%B %Y')}")  # Show formatted date
-
-        # Format the date as YYYY-MM for database
-        period = period_date.strftime('%Y-%m')
+            try:
+                period_date = st.date_input(
+                    "Select Statement Period",  # Add proper label
+                    value=date.today(),
+                    min_value=date(2020, 1, 1),
+                    max_value=date.today(),
+                    help="Select the month and year for the financial statements",
+                    label_visibility="collapsed"  # Hide label but keep it for accessibility
+                )
+                # Only show formatted date if period_date is not None
+                if period_date:
+                    with col2:
+                        st.markdown(f"**Selected Period:** {period_date.strftime('%B %Y')}")
+                    
+                    # Format the date as YYYY-MM for database
+                    period = period_date.strftime('%Y-%m')
+                else:
+                    st.error("Please select a valid date")
+                    period = None
+            except Exception as e:
+                st.error(f"Error with date selection: {str(e)}")
+                period = None
 
         if uploaded_file is not None and period:
             try:
@@ -255,27 +265,50 @@ def main():
             # Period selection for comparison
             st.markdown("### Select Periods to Compare")
             col1, col2 = st.columns(2)
+            
+            # First Period
             with col1:
                 st.markdown("**First Period**")
-                period1_date = st.date_input(
-                    "",
-                    value=date.today(),
-                    min_value=date(2020, 1, 1),
-                    max_value=date.today(),
-                    key="period1_date"
-                )
-                period1 = period1_date.strftime('%Y-%m')
-                
+                try:
+                    period1_date = st.date_input(
+                        "Select First Period",
+                        value=date.today(),
+                        min_value=date(2020, 1, 1),
+                        max_value=date.today(),
+                        key="period1_date",
+                        label_visibility="collapsed"
+                    )
+                    if period1_date:
+                        period1 = period1_date.strftime('%Y-%m')
+                        st.markdown(f"**Selected:** {period1_date.strftime('%B %Y')}")
+                    else:
+                        st.error("Please select a valid first period")
+                        period1 = None
+                except Exception as e:
+                    st.error(f"Error with first period selection: {str(e)}")
+                    period1 = None
+            
+            # Second Period
             with col2:
                 st.markdown("**Second Period**")
-                period2_date = st.date_input(
-                    "",
-                    value=date.today(),
-                    min_value=date(2020, 1, 1),
-                    max_value=date.today(),
-                    key="period2_date"
-                )
-                period2 = period2_date.strftime('%Y-%m')
+                try:
+                    period2_date = st.date_input(
+                        "Select Second Period",
+                        value=date.today(),
+                        min_value=date(2020, 1, 1),
+                        max_value=date.today(),
+                        key="period2_date",
+                        label_visibility="collapsed"
+                    )
+                    if period2_date:
+                        period2 = period2_date.strftime('%Y-%m')
+                        st.markdown(f"**Selected:** {period2_date.strftime('%B %Y')}")
+                    else:
+                        st.error("Please select a valid second period")
+                        period2 = None
+                except Exception as e:
+                    st.error(f"Error with second period selection: {str(e)}")
+                    period2 = None
             
             if period1 and period2:
                 # Get statements for selected periods
