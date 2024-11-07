@@ -57,7 +57,13 @@ def detect_format(file_obj: io.BytesIO) -> str:
     return 'unknown'
 
 def validate_dataframe(df: pd.DataFrame) -> bool:
-    """Validate if the DataFrame has the required columns and structure"""
+    """
+    Validate if the DataFrame has the required columns and structure.
+    Numeric columns allow:
+    - Zero values (0)
+    - Empty cells (converted to 0)
+    - Positive and negative numbers
+    """
     required_columns = {
         'Account_code', 'Account_name',
         'opening_balance_debit', 'opening_balance_credit',
@@ -78,8 +84,15 @@ def validate_dataframe(df: pd.DataFrame) -> bool:
     ]
     
     for col in numeric_columns:
-        if not pd.to_numeric(df[col], errors='coerce').notna().all():
-            raise ValueError(f"Column {col} must contain only numeric values")
+        # Convert empty strings and NaN to 0 first
+        df[col] = df[col].replace('', 0)
+        df[col] = df[col].fillna(0)
+        
+        # Try converting to numeric, allowing 0 values
+        try:
+            df[col] = pd.to_numeric(df[col])
+        except ValueError as e:
+            raise ValueError(f"Column {col} contains non-numeric values. Please ensure all values are numbers. Zero values and empty cells are allowed.")
     
     # Validate account code and name
     if df['Account_code'].isna().any():
