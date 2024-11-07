@@ -104,13 +104,21 @@ def main():
             type=['csv', 'xlsx']
         )
         
-        # Period selection
-        period_date = st.date_input(
-            "Select Period",
-            value=date.today(),
-            help="Select the month and year for the financial statements"
-        )
-        # Format the date as YYYY-MM
+        # Period selection with calendar
+        st.markdown("### Select Period")
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            period_date = st.date_input(
+                "",  # Remove label as we're using markdown above
+                value=date.today(),
+                min_value=date(2020, 1, 1),  # Set reasonable min date
+                max_value=date.today(),  # Can't select future dates
+                help="Select the month and year for the financial statements"
+            )
+        with col2:
+            st.markdown(f"**Selected Period:** {period_date.strftime('%B %Y')}")  # Show formatted date
+
+        # Format the date as YYYY-MM for database
         period = period_date.strftime('%Y-%m')
 
         if uploaded_file is not None and period:
@@ -245,29 +253,26 @@ def main():
             st.info("No historical data available for comparison. Please generate some statements first.")
         else:
             # Period selection for comparison
+            st.markdown("### Select Periods to Compare")
             col1, col2 = st.columns(2)
             with col1:
-                try:
-                    default_date1 = datetime.strptime(all_periods[0], '%Y-%m')
-                except (IndexError, ValueError):
-                    default_date1 = date.today()
-                
+                st.markdown("**First Period**")
                 period1_date = st.date_input(
-                    "Select First Period",
-                    value=default_date1,
+                    "",
+                    value=date.today(),
+                    min_value=date(2020, 1, 1),
+                    max_value=date.today(),
                     key="period1_date"
                 )
                 period1 = period1_date.strftime('%Y-%m')
                 
             with col2:
-                try:
-                    default_date2 = datetime.strptime(all_periods[-1], '%Y-%m')
-                except (IndexError, ValueError):
-                    default_date2 = date.today()
-                    
+                st.markdown("**Second Period**")
                 period2_date = st.date_input(
-                    "Select Second Period",
-                    value=default_date2,
+                    "",
+                    value=date.today(),
+                    min_value=date(2020, 1, 1),
+                    max_value=date.today(),
                     key="period2_date"
                 )
                 period2 = period2_date.strftime('%Y-%m')
