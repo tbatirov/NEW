@@ -1,3 +1,4 @@
+"""Main Streamlit application file"""
 import streamlit as st
 import pandas as pd
 from indexer import setup_knowledge_base
@@ -15,6 +16,7 @@ import plotly.graph_objects as go
 from openai import OpenAI
 from scraper import schedule_updates
 from update_checker import check_update_status
+from file_handlers import read_financial_file  # new file handlers added
 
 # Initialize OpenAI client
 openai_client = OpenAI()
@@ -39,7 +41,7 @@ with st.sidebar:
             st.write(f"Total Standards: {status['total_standards']}")
             if status['latest_update']:
                 st.write(f"Last Update: {status['latest_update']}")
-            
+
             st.write("Recent Activity:")
             for log in status['latest_logs']:
                 timestamp, source, status_type, message = log
@@ -198,10 +200,12 @@ def main():
     # Generate Statements Page
     if selected_page == "Generate Statements":
         st.header("Generate Statements")
-        # File upload
+        
+        # File upload with expanded format support
         uploaded_file = st.file_uploader(
-            "Upload Trial Balance (CSV or Excel)",
-            type=['csv', 'xlsx']
+            "Upload Trial Balance File",
+            type=['csv', 'xlsx', 'xls', 'json', 'xml', 'txt'],
+            help="Supported formats: CSV, Excel, JSON, XML, Fixed-width text"
         )
         
         # Period selection with calendar
@@ -220,11 +224,10 @@ def main():
 
         if uploaded_file is not None and period:
             try:
-                # Read the file
-                if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                else:
-                    df = pd.read_excel(uploaded_file)
+                # Read the file using the new handler
+                file_contents = uploaded_file.read()
+                file_obj = io.BytesIO(file_contents)
+                df = read_financial_file(file_obj, uploaded_file.name)
 
                 # Save trial balance to database
                 trial_balance_id = save_trial_balance(
