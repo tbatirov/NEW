@@ -3,9 +3,13 @@ import pandas as pd
 from indexer import setup_knowledge_base
 from processor import process_trial_balance
 from ratios import calculate_ratios
+from comparison import calculate_variances, generate_comparison_charts
 import io
 import json
-from database import save_trial_balance, save_statements, get_historical_statements
+from database import (
+    save_trial_balance, save_statements, get_historical_statements,
+    get_statements_by_period
+)
 from datetime import datetime
 import plotly.graph_objects as go
 
@@ -71,8 +75,8 @@ if 'knowledge_base' not in st.session_state:
         st.session_state.knowledge_base = setup_knowledge_base()
 
 def display_historical_statement(statement_data):
-    file_name, balance_sheet, income_statement, cash_flow, generation_date = statement_data
-    with st.expander(f"Statement from {generation_date} - {file_name}"):
+    file_name, balance_sheet, income_statement, cash_flow, generation_date, period = statement_data
+    with st.expander(f"Statement from {generation_date} - {file_name} ({period})"):
         st.markdown("#### Balance Sheet")
         display_financial_section(json.loads(balance_sheet))
         
@@ -91,7 +95,7 @@ def main():
     st.write("Generate financial statements according to NAS Uzbekistan standards")
 
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["Generate Statements", "Financial Ratios", "History"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Generate Statements", "Financial Ratios", "Compare Periods", "History"])
 
     with tab1:
         # File upload
@@ -99,8 +103,14 @@ def main():
             "Upload Trial Balance (CSV or Excel)",
             type=['csv', 'xlsx']
         )
+        
+        # Period selection
+        period = st.text_input(
+            "Enter Period (e.g., '2024-01' for January 2024)",
+            help="Enter the period in YYYY-MM format"
+        )
 
-        if uploaded_file is not None:
+        if uploaded_file is not None and period:
             try:
                 # Read the file
                 if uploaded_file.name.endswith('.csv'):
@@ -111,7 +121,8 @@ def main():
                 # Save trial balance to database
                 trial_balance_id = save_trial_balance(
                     uploaded_file.name,
-                    df.to_json(orient='records')
+                    df.to_json(orient='records'),
+                    period
                 )
 
                 # Display the uploaded data
@@ -139,13 +150,13 @@ def main():
                         st.markdown("## Balance Sheet")
                         display_financial_section(statements['balance_sheet'])
 
-                        st.markdown("---")  # Add separator
+                        st.markdown("---")
 
                         # Income Statement
                         st.markdown("## Income Statement")
                         display_financial_section(statements['income_statement'])
 
-                        st.markdown("---")  # Add separator
+                        st.markdown("---")
 
                         # Cash Flow Statement
                         st.markdown("## Cash Flow Statement")
@@ -157,7 +168,7 @@ def main():
                         st.download_button(
                             label="Download Statements",
                             data=output.getvalue(),
-                            file_name="financial_statements.csv",
+                            file_name=f"financial_statements_{period}.csv",
                             mime="text/csv"
                         )
 
@@ -207,13 +218,11 @@ def main():
                     else:
                         for ratio_name, ratio_value in category_ratios.items():
                             if ratio_value is not None:
-                                # Create columns for ratio name, value, and explanation
                                 rcol1, rcol2 = st.columns([2, 1])
                                 with rcol1:
                                     st.write(ratio_name.replace('_', ' ').title())
                                 with rcol2:
                                     st.write(f"{ratio_value:.2f}")
-                                # Add tooltip with explanation
                                 if ratio_name in explanations:
                                     st.info(explanations[ratio_name])
                 
@@ -224,6 +233,86 @@ def main():
             st.info("Generate financial statements first to view ratios")
 
     with tab3:
+        st.header("Compare Periods")
+        
+        # Period selection for comparison
+        col1, col2 = st.columns(2)
+        with col1:
+            period1 = st.selectbox(
+                "Select First Period",
+                [stmt[5] for stmt in get_historical_statements()],
+                key="period1"
+            )
+        with col2:
+            period2 = st.selectbox(
+                "Select Second Period",
+                [stmt[5] for stmt in get_historical_statements()],
+                key="period2"
+            )
+        
+        if period1 and period2:
+            # Get statements for selected periods
+            stmt1 = get_statements_by_period(period1)
+            stmt2 = get_statements_by_period(period2)
+            
+            if stmt1 and stmt2:
+                # Parse statements
+                statements1 = {
+                    'balance_sheet': json.loads(stmt1[1]),
+                    'income_statement': json.loads(stmt1[2]),
+                    'cash_flow': json.loads(stmt1[3])
+                }
+                statements2 = {
+                    'balance_sheet': json.loads(stmt2[1]),
+                    'income_statement': json.loads(stmt2[2]),
+                    'cash_flow': json.loads(stmt2[3])
+                }
+                
+                # Calculate variances
+                variances = calculate_variances(statements1, statements2)
+                
+                # Display side-by-side comparison
+                st.subheader("Statement Comparison")
+                
+                # Balance Sheet Comparison
+                st.markdown("### Balance Sheet")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.markdown(f"#### {period1}")
+                    display_financial_section(statements1['balance_sheet'])
+                with col2:
+                    st.markdown(f"#### {period2}")
+                    display_financial_section(statements2['balance_sheet'])
+                with col3:
+                    st.markdown("#### Variances")
+                    display_financial_section(variances['balance_sheet'])
+                
+                st.markdown("---")
+                
+                # Income Statement Comparison
+                st.markdown("### Income Statement")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.markdown(f"#### {period1}")
+                    display_financial_section(statements1['income_statement'])
+                with col2:
+                    st.markdown(f"#### {period2}")
+                    display_financial_section(statements2['income_statement'])
+                with col3:
+                    st.markdown("#### Variances")
+                    display_financial_section(variances['income_statement'])
+                
+                # Generate and display trend charts
+                st.subheader("Trend Analysis")
+                comparison_data = generate_comparison_charts([
+                    {'period': period1, 'statements': statements1},
+                    {'period': period2, 'statements': statements2}
+                ])
+                st.plotly_chart(comparison_data['trend_chart'])
+            else:
+                st.warning("Could not find statements for one or both selected periods")
+
+    with tab4:
         st.header("Historical Statements")
         historical_statements = get_historical_statements()
         if historical_statements:
