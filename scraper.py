@@ -25,15 +25,39 @@ def get_nsbu_links() -> List[str]:
         
         return list(set(standard_links))
     except Exception as e:
-        print(f"Error fetching links: {e}")
+        print(f"Error fetching links from nsbu.uz: {e}")
+        return []
+
+def get_buxgalter_links() -> List[str]:
+    base_url = "https://buxgalter.uz"
+    try:
+        response = requests.get(base_url)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        links = soup.find_all('a', href=True)
+        
+        # Filter relevant links (adjust patterns based on website structure)
+        relevant_links = [
+            link['href'] if link['href'].startswith('http') else base_url + link['href']
+            for link in links
+            if any(term in link['href'].lower() for term in ['standard', 'nsbu', 'regulation', 'law'])
+        ]
+        
+        return list(set(relevant_links))
+    except Exception as e:
+        print(f"Error fetching buxgalter.uz links: {e}")
         return []
 
 def scrape_standards() -> List[Dict[str, str]]:
-    """Scrape all accounting standards from nsbu.uz"""
     standards = []
-    links = get_nsbu_links()
     
-    for link in links:
+    # Get links from both sources
+    nsbu_links = get_nsbu_links()
+    buxgalter_links = get_buxgalter_links()
+    all_links = nsbu_links + buxgalter_links
+    
+    for link in all_links:
         try:
             # Use trafilatura to extract clean text
             downloaded = trafilatura.fetch_url(link)
@@ -42,7 +66,8 @@ def scrape_standards() -> List[Dict[str, str]]:
             if text:
                 standards.append({
                     'url': link,
-                    'content': text
+                    'content': text,
+                    'source': 'nsbu.uz' if 'nsbu.uz' in link else 'buxgalter.uz'
                 })
             
             # Respectful crawling
