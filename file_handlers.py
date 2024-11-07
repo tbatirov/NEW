@@ -32,9 +32,12 @@ def detect_format(file_obj: io.BytesIO) -> str:
                 pass
         
         # Check for CSV format
-        dialect = csv.Sniffer().sniff(content_str)
-        if dialect:
-            return 'csv'
+        try:
+            dialect = csv.Sniffer().sniff(content_str)
+            if dialect:
+                return 'csv'
+        except:
+            pass
             
     except UnicodeDecodeError:
         pass
@@ -55,27 +58,50 @@ def detect_format(file_obj: io.BytesIO) -> str:
 
 def validate_dataframe(df: pd.DataFrame) -> bool:
     """Validate if the DataFrame has the required columns and structure"""
-    required_columns = {'Account', 'Debit', 'Credit'}
+    required_columns = {
+        'Account_code', 'Account_name',
+        'opening_balance_debit', 'opening_balance_credit',
+        'current_turnover_debit', 'current_turnover_credit',
+        'end_of_period_debit', 'end_of_period_credit'
+    }
     
     # Check if required columns exist
-    if not required_columns.issubset(df.columns):
-        raise ValueError(f"Missing required columns. Required: {required_columns}")
+    missing_columns = required_columns - set(df.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
     
     # Validate numeric columns
-    for col in ['Debit', 'Credit']:
+    numeric_columns = [
+        'opening_balance_debit', 'opening_balance_credit',
+        'current_turnover_debit', 'current_turnover_credit',
+        'end_of_period_debit', 'end_of_period_credit'
+    ]
+    
+    for col in numeric_columns:
         if not pd.to_numeric(df[col], errors='coerce').notna().all():
             raise ValueError(f"Column {col} must contain only numeric values")
+    
+    # Validate account code and name
+    if df['Account_code'].isna().any():
+        raise ValueError("Account_code cannot contain empty values")
+    if df['Account_name'].isna().any():
+        raise ValueError("Account_name cannot contain empty values")
     
     return True
 
 def parse_fixed_width(file_obj: io.BytesIO) -> pd.DataFrame:
     """Parse fixed-width format file"""
-    # Common fixed-width format for trial balance:
-    # Account: 0-30, Debit: 31-45, Credit: 46-60
-    widths = [30, 15, 15]
+    # Define column widths for the new structure
+    widths = [10, 30, 15, 15, 15, 15, 15, 15]  # Adjusted for new columns
+    names = [
+        'Account_code', 'Account_name',
+        'opening_balance_debit', 'opening_balance_credit',
+        'current_turnover_debit', 'current_turnover_credit',
+        'end_of_period_debit', 'end_of_period_credit'
+    ]
     
     try:
-        df = pd.read_fwf(file_obj, widths=widths, names=['Account', 'Debit', 'Credit'])
+        df = pd.read_fwf(file_obj, widths=widths, names=names)
         df = df.fillna(0)  # Replace NaN with 0 for numeric columns
         return df
     except Exception as e:
@@ -90,9 +116,14 @@ def parse_xml(file_obj: io.BytesIO) -> pd.DataFrame:
         data = []
         for entry in root.findall('.//entry'):
             row = {
-                'Account': entry.find('account').text if entry.find('account') is not None else '',
-                'Debit': float(entry.find('debit').text) if entry.find('debit') is not None else 0,
-                'Credit': float(entry.find('credit').text) if entry.find('credit') is not None else 0
+                'Account_code': entry.find('account_code').text if entry.find('account_code') is not None else '',
+                'Account_name': entry.find('account_name').text if entry.find('account_name') is not None else '',
+                'opening_balance_debit': float(entry.find('opening_debit').text) if entry.find('opening_debit') is not None else 0,
+                'opening_balance_credit': float(entry.find('opening_credit').text) if entry.find('opening_credit') is not None else 0,
+                'current_turnover_debit': float(entry.find('turnover_debit').text) if entry.find('turnover_debit') is not None else 0,
+                'current_turnover_credit': float(entry.find('turnover_credit').text) if entry.find('turnover_credit') is not None else 0,
+                'end_of_period_debit': float(entry.find('ending_debit').text) if entry.find('ending_debit') is not None else 0,
+                'end_of_period_credit': float(entry.find('ending_credit').text) if entry.find('ending_credit') is not None else 0
             }
             data.append(row)
         
@@ -105,11 +136,25 @@ def parse_json(file_obj: io.BytesIO) -> pd.DataFrame:
     try:
         data = json.load(file_obj)
         if isinstance(data, list):
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
         elif isinstance(data, dict) and 'entries' in data:
-            return pd.DataFrame(data['entries'])
+            df = pd.DataFrame(data['entries'])
         else:
             raise ValueError("Invalid JSON structure")
+        
+        # Ensure all required columns exist
+        required_columns = [
+            'Account_code', 'Account_name',
+            'opening_balance_debit', 'opening_balance_credit',
+            'current_turnover_debit', 'current_turnover_credit',
+            'end_of_period_debit', 'end_of_period_credit'
+        ]
+        
+        for col in required_columns:
+            if col not in df.columns:
+                df[col] = 0
+                
+        return df
     except Exception as e:
         raise ValueError(f"Error parsing JSON file: {str(e)}")
 
@@ -135,9 +180,15 @@ def read_financial_file(file_obj: io.BytesIO, filename: str) -> pd.DataFrame:
         # Validate the DataFrame structure
         validate_dataframe(df)
         
-        # Clean up the data
-        df['Debit'] = pd.to_numeric(df['Debit'], errors='coerce').fillna(0)
-        df['Credit'] = pd.to_numeric(df['Credit'], errors='coerce').fillna(0)
+        # Clean up the data - ensure numeric columns are proper type
+        numeric_columns = [
+            'opening_balance_debit', 'opening_balance_credit',
+            'current_turnover_debit', 'current_turnover_credit',
+            'end_of_period_debit', 'end_of_period_credit'
+        ]
+        
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         return df
         
