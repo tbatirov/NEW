@@ -6,8 +6,8 @@ import time
 
 def get_nsbu_links() -> List[str]:
     """Get all relevant links from nsbu.uz"""
-    base_url = "https://www.nsbu.uz"
-    standards_page = "/standards/"  # Removed /en/ since English version isn't available
+    base_url = "https://nsbu.uz"  # Updated URL without www
+    standards_page = "/page/buxgalteriya-hisobi-milliy-standartlari"  # Updated to actual standards page
     
     try:
         response = requests.get(base_url + standards_page)
@@ -18,9 +18,9 @@ def get_nsbu_links() -> List[str]:
         
         # Filter for standard-related links
         standard_links = [
-            base_url + link['href']
+            link['href'] if link['href'].startswith('http') else base_url + link['href']
             for link in links
-            if 'standard' in link['href'].lower()
+            if 'bhms' in link['href'].lower() or 'standard' in link['href'].lower()
         ]
         
         return list(set(standard_links))

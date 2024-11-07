@@ -10,6 +10,26 @@ st.set_page_config(
     layout="wide"
 )
 
+# Helper functions for financial statement display
+def format_amount(amount):
+    try:
+        return f"{float(amount):,.2f}"
+    except:
+        return amount
+
+def display_financial_section(data, indent_level=0):
+    for key, value in data.items():
+        # Format the key for display
+        display_key = key.replace('_', ' ').title()
+        
+        # If value is a dict, create a section
+        if isinstance(value, dict):
+            st.markdown(f"{'#' * (indent_level + 4)} {display_key}")
+            display_financial_section(value, indent_level + 1)
+        else:
+            # Display leaf nodes with proper number formatting
+            st.write(f"{'    ' * indent_level}{display_key}: {format_amount(value)}")
+
 # Initialize session state
 if 'knowledge_base' not in st.session_state:
     with st.spinner('Setting up knowledge base...'):
@@ -45,20 +65,24 @@ def main():
                         st.session_state.knowledge_base
                     )
                     
-                    # Display results
+                    # Display results with improved formatting
                     st.subheader("Generated Financial Statements")
                     
                     # Balance Sheet
-                    st.markdown("### Balance Sheet")
-                    st.json(statements['balance_sheet'])
-                    
+                    st.markdown("## Balance Sheet")
+                    display_financial_section(statements['balance_sheet'])
+
+                    st.markdown("---")  # Add separator
+
                     # Income Statement
-                    st.markdown("### Income Statement")
-                    st.json(statements['income_statement'])
-                    
+                    st.markdown("## Income Statement")
+                    display_financial_section(statements['income_statement'])
+
+                    st.markdown("---")  # Add separator
+
                     # Cash Flow Statement
-                    st.markdown("### Cash Flow Statement")
-                    st.json(statements['cash_flow'])
+                    st.markdown("## Cash Flow Statement")
+                    display_financial_section(statements['cash_flow'])
 
                     # Download button
                     output = io.StringIO()
